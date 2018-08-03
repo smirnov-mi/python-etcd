@@ -11,6 +11,8 @@ Official documentation: http://python-etcd.readthedocs.org/
 .. image:: https://coveralls.io/repos/jplana/python-etcd/badge.svg?branch=master&service=github
    :target: https://coveralls.io/github/jplana/python-etcd?branch=master
 
+SSL CERT set to OPTIONAL instead of required.
+
 Installation
 ------------
 
