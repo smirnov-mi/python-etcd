@@ -169,7 +169,7 @@ class Client(object):
 
         if ca_cert:
             kw['ca_certs'] = ca_cert
-            kw['cert_reqs'] = ssl.CERT_OPTIONAL
+            kw['cert_reqs'] = ssl.CERT_REQUIRED
 
         self.username = None
         self.password = None
@@ -214,8 +214,12 @@ class Client(object):
         Sets the version information provided by the server.
         """
         # Set the version
-        data = self.api_execute('/version', self._MGET).data
-        version_info = json.loads(data.decode('utf-8'))
+        version_info = json.loads(self.http.request(
+            self._MGET,
+            self._base_uri + '/version',
+            headers=self._get_headers(),
+            timeout=self.read_timeout,
+            redirect=self.allow_redirect).data.decode('utf-8'))
         self._version = version_info['etcdserver']
         self._cluster_version = version_info['etcdcluster']
 
@@ -228,7 +232,7 @@ class Client(object):
                 (answer.target.to_text(omit_final_dot=True), answer.port))
         _log.debug("Found %s", hosts)
         if not len(hosts):
-            raise ValueError("The SRV record is present but no hosts were found")
+            raise ValueError("The SRV record is present but no host were found")
         return tuple(hosts)
 
     def __del__(self):
@@ -818,7 +822,7 @@ class Client(object):
 
     def _next_server(self, cause=None):
         """ Selects the next server in the list, refreshes the server list. """
-        _log.debug("Selecting next machine in cache. Available machines: %s",
+        _log.debug("Selection next machine in cache. Available machines: %s",
                    self._machines_cache)
         try:
             mach = self._machines_cache.pop()
@@ -852,7 +856,7 @@ class Client(object):
                     # Check the cluster ID hasn't changed under us.  We use
                     # preload_content=False above so we can read the headers
                     # before we wait for the content of a watch.
-                    self._check_cluster_id(response, path)
+                    self._check_cluster_id(response)
                     # Now force the data to be preloaded in order to trigger any
                     # IO-related errors in this method rather than when we try to
                     # access it later.
@@ -892,7 +896,7 @@ class Client(object):
                     _log.warning(e)
                     raise
                 except:
-                    _log.debug("Unexpected request failure, re-raising.")
+                    _log.exception("Unexpected request failure, re-raising.")
                     raise
 
                 if some_request_failed:
@@ -946,11 +950,10 @@ class Client(object):
                                  headers=headers,
                                  preload_content=False)
 
-    def _check_cluster_id(self, response, path):
+    def _check_cluster_id(self, response):
         cluster_id = response.getheader("x-etcd-cluster-id")
         if not cluster_id:
-            if self.version_prefix in path:
-                _log.warning("etcd response did not contain a cluster ID")
+            _log.warning("etcd response did not contain a cluster ID")
             return
         id_changed = (self.expected_cluster_id and
                       cluster_id != self.expected_cluster_id)
